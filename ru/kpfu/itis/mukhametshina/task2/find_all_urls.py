@@ -14,7 +14,7 @@ HEADERS = {
 
 
 def change_set():
-    all_sites.add('lox')
+    all_sites.add('site')
 
 
 def get_html(url, params=''):

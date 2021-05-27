@@ -1,5 +1,6 @@
 import vk_api
 
+
 def vk_craw(login, password):
     vk_session = vk_api.VkApi(login, password)
 
@@ -21,8 +22,6 @@ def vk_craw(login, password):
                 answer[word] = 1
 
     answer = {k: v for k, v in sorted(answer.items(), key=lambda item: item[1])}
-    for i in answer.keys():
-        print(str(i) + " " + str(answer[i]))
+
     return answer
 
-vk_craw('89003235143', 'DoL8a9T6')

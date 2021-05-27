@@ -1,38 +1,45 @@
-import requests
-import vk_api
 import psycopg2
 
-import airflow
 from airflow import DAG
 import datetime
 from datetime import timedelta
 from airflow.operators.python import PythonOperator
-
+import re
 from vkcrawler import vk_craw
 
 con = psycopg2
 
+def deEmojify(text):
+    regrex_pattern = re.compile(pattern = "["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           "]+", flags = re.UNICODE)
+    return regrex_pattern.sub(r'',text)
 
 def connectBD():
     global con
     con = psycopg2.connect(host='database-1.cj4nt3ktyazz.us-east-1.rds.amazonaws.com',
                            port='5432', user='postgres', password='postgres')
+    return con
 
 
-def topWords():
-    un_wordsR = vk_craw('login', 'password')
-    save_data(un_wordsR, con)
+def start():
+    c = connectBD()
+    words = vk_craw('login', 'password')
+    save_data(words, c)
 
 
-def save_data(un_wordsR, con):
-    leng = len(un_wordsR)
+def save_data(words, con):
+    leng = len(words)
     with con.cursor() as cursor:
         i = 0
-        cursor.execute(f'''TRUNCATE TABLE  wordss;''')
-
-        for w in un_wordsR:
+        cursor.execute(f'TRUNCATE TABLE  words;')
+        for key in words.keys():
             print(f'\r записывается {i + 1} из {leng}', end="", flush=True)
-            cursor.execute(f'''INSERT INTO wordss (word, counter) VALUES('{w}',{un_wordsR[w]});''')
+            word = '\'' + deEmojify(key) + '\''
+            cursor.execute(f"INSERT INTO words (word, counter) VALUES({word},{words[key]});")
             i += 1
 
     con.commit()
@@ -40,8 +47,7 @@ def save_data(un_wordsR, con):
 
 
 def main():
-    connectBD()
-    topWords()
+    start()
 
 
 main()
@@ -51,13 +57,13 @@ args = {
     'start_date': datetime.datetime(2021, 3, 18),
     'retries': 1,
     'schedule_interval': '@daily',
-    'retry_delay': datetime.timedelta(days=1),
+    'retry_delay': datetime.timedelta(minutes=1),
     'depends_on_past': False,
 }
 
 with DAG(dag_id='FirstDag', default_args=args, schedule_interval=timedelta(days=1)) as dag:
     parse_vk = PythonOperator(
-        task_id='topWordsVk',
+        task_id='unique_words_in_vk',
         python_callable=main,
         dag=dag
     )
